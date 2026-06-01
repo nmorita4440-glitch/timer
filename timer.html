@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>集中学習タイマー（連動版）</title>
+    <style>
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; text-align: center; background-color: #f4f7f6; color: #333; padding: 20px; }
+        .container { max-width: 400px; margin: 50px auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h1 { font-size: 24px; color: #2c3e50; margin-bottom: 20px; }
+        #timer { font-size: 60px; font-weight: bold; margin: 20px 0; color: #e74c3c; font-variant-numeric: tabular-nums; }
+        button { font-size: 18px; padding: 12px 30px; border: none; background-color: #2ecc71; color: white; border-radius: 25px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        button:hover { background-color: #27ae60; }
+        button:disabled { background-color: #bdc3c7; cursor: not-allowed; }
+        #alert-msg { color: #e74c3c; font-weight: bold; margin-top: 20px; min-height: 24px; }
+        input { font-size: 16px; padding: 8px; width: 80%; margin-bottom: 20px; text-align: center; border: 1px solid #ccc; border-radius: 5px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>集中学習タイマー</h1>
+    
+    <input type="text" id="studentName" value="" placeholder="名前を入力してください">
+    
+    <p style="font-size: 12px; color:#666;">※学習中に画面を閉じたり、他のアプリを開くと塾長に通知されます！</p>
+    
+    <div id="timer">25:00</div>
+    <button id="startBtn" onclick="startTimer()">タイマー開始</button>
+    
+    <div id="alert-msg"></div>
+</div>
+
+<script>
+    // ★★★"https://script.google.com/macros/s/AKfycbxqz-asGtZ8au-iCACxIb4_y0WCtlR18ZqqC8dThOscQL8L22_Gmo2WDChSZLj3Uc7Y/exec"★★★
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxqz-asGtZ8au-iCACxIb4_y0WCtlR18ZqqC8dThOscQL8L22_Gmo2WDChSZLj3Uc7Y/exec";
+
+    let countdown;
+    let timeLeft = 25 * 60; 
+    let isRunning = false;
+
+    const timerDisplay = document.getElementById('timer');
+    const startBtn = document.getElementById('startBtn');
+    const alertMsg = document.getElementById('alert-msg');
+    const nameInput = document.getElementById('studentName');
+
+    function displayTime(seconds) {
+        const min = String(Math.floor(seconds / 60)).padStart(2, '0');
+        const sec = String(seconds % 60).padStart(2, '0');
+        timerDisplay.textContent = `${min}:${sec}`;
+    }
+
+    // スプレッドシートにデータを送信する魔法の関数
+    function sendLog(actionName) {
+        const sName = nameInput.value || "名無し生徒";
+        const min = String(Math.floor(timeLeft / 60)).padStart(2, '0');
+        const sec = String(timeLeft % 60).padStart(2, '0');
+        const timeStr = `${min}分${sec}秒`;
+
+        fetch(WEB_APP_URL, {
+            method: "POST",
+            mode: "no-cors",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                studentName: sName,
+                action: actionName,
+                timeLeft: timeStr
+            })
+        });
+    }
+
+    function startTimer() {
+        if (isRunning) return;
+        isRunning = true;
+        startBtn.disabled = true;
+        nameInput.disabled = true;
+        alertMsg.textContent = "";
+
+        // 開始ログを送信
+        sendLog("タイマー開始");
+
+        countdown = setInterval(() => {
+            timeLeft--;
+            displayTime(timeLeft);
+
+            if (timeLeft <= 0) {
+                clearInterval(countdown);
+                isRunning = false;
+                startBtn.disabled = false;
+                nameInput.disabled = false;
+                timerDisplay.textContent = "終了！";
+                alertMsg.style.color = "#2ecc71";
+                alertMsg.textContent = "お疲れ様でした！";
+                
+                // 完了ログを送信
+                sendLog("タイマー完了🎉");
+            }
+        }, 1000);
+    }
+
+    // 画面離脱（サボり）の検知
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden && isRunning) {
+            clearInterval(countdown);
+            isRunning = false;
+            startBtn.disabled = false;
+            nameInput.disabled = false;
+            alertMsg.style.color = "#e74c3c";
+            alertMsg.textContent = "⚠️ 画面が離脱したためタイマーを停止しました！";
+
+            // ★サボったログをスプレッドシートに送信！
+            sendLog("画面離脱（サボり）⚠️");
+        }
+    });
+</script>
+
+</body>
+</html>
